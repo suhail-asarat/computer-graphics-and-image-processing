@@ -1,0 +1,19 @@
+SPATIAL PROPERTIES
+Width x height: 256 x 256 pixels
+Total pixels: 65536
+Channels: 1
+
+PHYSICAL/STORAGE PROPERTIES
+Data type: uint8
+Bit depth: 8 bits/pixel
+Theoretical uncompressed size: 524288 bits (65536 bytes)
+Actual file size: 65240 bytes
+
+INFORMATIONAL PROPERTIES
+Minimum intensity: 7
+Maximum intensity: 253
+Dynamic range: 246
+Mean intensity: 118.7245
+Standard deviation: 62.3412
+Entropy: 7.0097 bits/pixel
+Estimated information: 459388.77 bits
