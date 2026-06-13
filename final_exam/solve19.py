@@ -1,13 +1,41 @@
 """Problem 19: Measure spatial, physical, and informational image properties."""
 
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
+import sys
+from textwrap import wrap
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 
 BASE_DIR = Path(__file__).resolve().parent
-OUTPUT_DIR = BASE_DIR / "outputs"
-OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+class Tee(StringIO):
+    def write(self, text: str) -> int:
+        sys.__stdout__.write(text)
+        sys.__stdout__.flush()
+        return super().write(text)
+
+
+def run_with_gui(main, title: str) -> None:
+    capture = Tee()
+    with redirect_stdout(capture):
+        main()
+    text = "\n".join(
+        part for line in capture.getvalue().strip().splitlines()
+        for part in (wrap(line, width=90) or [""])
+    )
+    if text:
+        figure = plt.figure(figsize=(10, 8))
+        figure.canvas.manager.set_window_title(title)
+        figure.text(0.03, 0.95, text, va="top", family="monospace")
+        figure.suptitle(title, fontweight="bold")
+        plt.axis("off")
+        plt.show()
+        plt.close(figure)
 
 
 def load_gray(name: str) -> np.ndarray:
@@ -56,11 +84,8 @@ def main() -> None:
         f"Entropy: {image_entropy:.4f} bits/pixel\n"
         f"Estimated information: {estimated_information_bits:.2f} bits\n"
     )
-    (OUTPUT_DIR / "solve19_image_properties.txt").write_text(
-        report, encoding="utf-8"
-    )
     print(report)
 
 
 if __name__ == "__main__":
-    main()
+    run_with_gui(main, "Problem 19 Results")

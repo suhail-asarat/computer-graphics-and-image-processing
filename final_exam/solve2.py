@@ -1,16 +1,45 @@
 """Problem 2: Compute a 32-bin histogram for an 8-bit image."""
 
+from contextlib import redirect_stdout
+from io import StringIO
+import sys
+from textwrap import wrap
+
 import matplotlib
 
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
-OUTPUT_DIR = BASE_DIR / "outputs"
-OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+class Tee(StringIO):
+    def write(self, text: str) -> int:
+        sys.__stdout__.write(text)
+        sys.__stdout__.flush()
+        return super().write(text)
+
+
+def run_with_gui(main, title: str) -> None:
+    capture = Tee()
+    with redirect_stdout(capture):
+        main()
+    lines = [
+        part
+        for line in capture.getvalue().strip().splitlines()
+        for part in (wrap(line, width=90) or [""])
+    ]
+    if not lines:
+        return
+    figure = plt.figure(figsize=(10, max(3, min(10, 1.2 + 0.3 * len(lines)))))
+    figure.canvas.manager.set_window_title(title)
+    figure.text(0.03, 0.97, "\n".join(lines), va="top", family="monospace")
+    figure.suptitle(title, fontsize=14, fontweight="bold")
+    plt.axis("off")
+    plt.show()
+    plt.close(figure)
 
 
 def load_gray(name: str) -> np.ndarray:
@@ -36,7 +65,7 @@ def main() -> None:
         xlim=(0, 256),
     )
     fig.tight_layout()
-    fig.savefig(OUTPUT_DIR / "solve2_histogram_32_bins.png", dpi=150)
+    plt.show()
     plt.close(fig)
 
     assert histogram.size == 32 and histogram.sum() == image.size
@@ -44,4 +73,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    run_with_gui(main, "Problem 2 Results")

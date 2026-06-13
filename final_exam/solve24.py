@@ -1,12 +1,15 @@
 """Problem 24: Train and evaluate a CNN on the MNIST digit database."""
 
 import argparse
+from contextlib import redirect_stdout
+from io import StringIO
 import os
 from pathlib import Path
+import sys
+from textwrap import wrap
 
 import matplotlib
 
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -17,8 +20,31 @@ from tinygrad import Tensor, nn
 from tinygrad.nn.datasets import mnist
 
 BASE_DIR = Path(__file__).resolve().parent
-OUTPUT_DIR = BASE_DIR / "outputs"
-OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+class Tee(StringIO):
+    def write(self, text: str) -> int:
+        sys.__stdout__.write(text)
+        sys.__stdout__.flush()
+        return super().write(text)
+
+
+def run_with_gui(main, title: str) -> None:
+    capture = Tee()
+    with redirect_stdout(capture):
+        main()
+    text = "\n".join(
+        part for line in capture.getvalue().strip().splitlines()
+        for part in (wrap(line, width=90) or [""])
+    )
+    if text:
+        figure = plt.figure(figsize=(10, 5))
+        figure.canvas.manager.set_window_title(title)
+        figure.text(0.03, 0.95, text, va="top", family="monospace")
+        figure.suptitle(title, fontweight="bold")
+        plt.axis("off")
+        plt.show()
+        plt.close(figure)
 
 
 class DigitCNN:
@@ -107,9 +133,6 @@ def main() -> None:
         predictions = predict_in_batches(model, x_test, args.batch_size)
     accuracy = float(np.mean(predictions == y_test) * 100)
 
-    model_path = OUTPUT_DIR / "solve24_mnist_cnn.safetensors"
-    nn.state.safe_save(nn.state.get_state_dict(model), str(model_path))
-
     figure, axes = plt.subplots(2, 5, figsize=(10, 4))
     for axis, image, label, prediction in zip(
         axes.ravel(), x_test[:10], y_test[:10], predictions[:10]
@@ -119,7 +142,7 @@ def main() -> None:
         axis.axis("off")
     figure.suptitle(f"MNIST CNN predictions - accuracy {accuracy:.2f}%")
     figure.tight_layout()
-    figure.savefig(OUTPUT_DIR / "solve24_mnist_predictions.png", dpi=150)
+    plt.show()
     plt.close(figure)
 
     assert len(predictions) == len(y_test)
@@ -127,8 +150,8 @@ def main() -> None:
     print(f"Training samples: {len(x_train)}")
     print(f"Test samples: {len(x_test)}")
     print(f"Test accuracy: {accuracy:.2f}%")
-    print(f"Model saved to: {model_path}")
+    print("The trained model remains in memory and was not saved to disk.")
 
 
 if __name__ == "__main__":
-    main()
+    run_with_gui(main, "Problem 24 Results")

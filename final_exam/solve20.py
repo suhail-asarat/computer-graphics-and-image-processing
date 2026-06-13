@@ -1,18 +1,45 @@
 """Problem 20: Huffman encode, decode, evaluate, and verify an image."""
 
+from contextlib import redirect_stdout
 import heapq
-import json
+from io import StringIO
 from dataclasses import dataclass
 from itertools import count
 from pathlib import Path
+import sys
+from textwrap import wrap
 from typing import Optional
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 
 BASE_DIR = Path(__file__).resolve().parent
-OUTPUT_DIR = BASE_DIR / "outputs"
-OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+class Tee(StringIO):
+    def write(self, text: str) -> int:
+        sys.__stdout__.write(text)
+        sys.__stdout__.flush()
+        return super().write(text)
+
+
+def run_with_gui(main, title: str) -> None:
+    capture = Tee()
+    with redirect_stdout(capture):
+        main()
+    text = "\n".join(
+        part for line in capture.getvalue().strip().splitlines()
+        for part in (wrap(line, width=90) or [""])
+    )
+    if text:
+        figure = plt.figure(figsize=(10, 6))
+        figure.canvas.manager.set_window_title(title)
+        figure.text(0.03, 0.95, text, va="top", family="monospace")
+        figure.suptitle(title, fontweight="bold")
+        plt.axis("off")
+        plt.show()
+        plt.close(figure)
 
 
 def load_gray(name: str) -> np.ndarray:
@@ -96,14 +123,8 @@ def main() -> None:
     encoded = "".join(codes[int(pixel)] for pixel in image.ravel())
     bit_array = np.fromiter((bit == "1" for bit in encoded), dtype=np.uint8)
     packed = np.packbits(bit_array)
-    (OUTPUT_DIR / "solve20_huffman.bin").write_bytes(packed.tobytes())
-    (OUTPUT_DIR / "solve20_codebook.json").write_text(
-        json.dumps({str(key): value for key, value in codes.items()}, indent=2),
-        encoding="utf-8",
-    )
 
     decoded = decode(encoded, tree, image.size).reshape(image.shape)
-    cv2.imwrite(str(OUTPUT_DIR / "solve20_reconstructed.png"), decoded)
     perfect_reconstruction = np.array_equal(image, decoded)
     assert perfect_reconstruction
 
@@ -117,14 +138,23 @@ def main() -> None:
         f"Average Huffman length: {average_code_length:.4f} bits/pixel\n"
         f"Original size: {original_bits} bits\n"
         f"Compressed data size: {compressed_bits} bits\n"
+        f"Packed in-memory size: {packed.nbytes} bytes\n"
         f"Compression ratio: {compression_ratio:.4f}:1\n"
         f"Perfect reconstruction: {perfect_reconstruction}"
     )
-    (OUTPUT_DIR / "solve20_huffman_report.txt").write_text(
-        report, encoding="utf-8"
-    )
     print(report)
+
+    figure, axes = plt.subplots(1, 2, figsize=(8, 4))
+    axes[0].imshow(image, cmap="gray", vmin=0, vmax=255)
+    axes[0].set_title("Original")
+    axes[1].imshow(decoded, cmap="gray", vmin=0, vmax=255)
+    axes[1].set_title("Huffman reconstruction")
+    for axis in axes:
+        axis.axis("off")
+    figure.tight_layout()
+    plt.show()
+    plt.close(figure)
 
 
 if __name__ == "__main__":
-    main()
+    run_with_gui(main, "Problem 20 Results")

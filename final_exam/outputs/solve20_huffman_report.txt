@@ -1,7 +1,0 @@
-Unique symbols: 247
-Entropy: 7.0097 bits/pixel
-Average Huffman length: 7.0448 bits/pixel
-Original size: 524288 bits
-Compressed data size: 461689 bits
-Compression ratio: 1.1356:1
-Perfect reconstruction: True
