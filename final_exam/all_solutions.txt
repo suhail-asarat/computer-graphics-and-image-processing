@@ -1,0 +1,1759 @@
+
+
+=== solve1.py ===
+
+"""Problem 1: Display the histogram of an 8-bit grayscale image."""
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import cv2
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def main() -> None:
+    image = load_gray("cameraman.tif")
+    histogram = np.bincount(image.ravel(), minlength=256)
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    axes[0].imshow(image, cmap="gray", vmin=0, vmax=255)
+    axes[0].set_title("8-bit grayscale image")
+    axes[0].axis("off")
+    axes[1].plot(np.arange(256), histogram, color="black")
+    axes[1].set(title="Histogram", xlabel="Intensity", ylabel="Pixel count")
+    axes[1].set_xlim(0, 255)
+    fig.tight_layout()
+    fig.savefig(OUTPUT_DIR / "solve1_histogram.png", dpi=150)
+    plt.close(fig)
+
+    assert histogram.sum() == image.size
+    print(f"Histogram contains {histogram.sum()} pixels across 256 levels.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve2.py ===
+
+"""Problem 2: Compute a 32-bin histogram for an 8-bit image."""
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import cv2
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def main() -> None:
+    image = load_gray("cameraman.tif")
+    bin_width = 256 // 32
+    bin_indices = image.ravel() // bin_width
+    histogram = np.bincount(bin_indices, minlength=32)
+    starts = np.arange(32) * bin_width
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.bar(starts, histogram, width=bin_width, align="edge", edgecolor="black")
+    ax.set(
+        title="32-bin histogram (8 intensity levels per bin)",
+        xlabel="Starting intensity",
+        ylabel="Pixel count",
+        xlim=(0, 256),
+    )
+    fig.tight_layout()
+    fig.savefig(OUTPUT_DIR / "solve2_histogram_32_bins.png", dpi=150)
+    plt.close(fig)
+
+    assert histogram.size == 32 and histogram.sum() == image.size
+    print("32-bin histogram:", histogram.tolist())
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve3.py ===
+
+"""Problem 3: Add a constant value to every image pixel."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    axes = [axes] if len(panels) == 1 else axes
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def main() -> None:
+    image = load_gray("cameraman.tif")
+    constant = 50
+    result = np.clip(image.astype(np.int16) + constant, 0, 255).astype(np.uint8)
+
+    save_panels(
+        "solve3_add_constant.png",
+        [("Original", image), (f"Original + {constant}", result)],
+    )
+    assert result.dtype == np.uint8
+    print(f"Added {constant}; output range is {result.min()} to {result.max()}.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve4.py ===
+
+"""Problem 4: Subtract one image from another."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def resize_like(image: np.ndarray, reference: np.ndarray) -> np.ndarray:
+    return cv2.resize(image, (reference.shape[1], reference.shape[0]))
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def main() -> None:
+    first = load_gray("cameraman.tif")
+    second = resize_like(load_gray("pout.tif"), first)
+    result = cv2.subtract(first, second)
+
+    save_panels(
+        "solve4_image_subtraction.png",
+        [("Image A", first), ("Image B", second), ("A - B (clipped)", result)],
+    )
+    print(f"Subtraction output range is {result.min()} to {result.max()}.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve5.py ===
+
+"""Problem 5: Perform image multiplication and division."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def resize_like(image: np.ndarray, reference: np.ndarray) -> np.ndarray:
+    return cv2.resize(image, (reference.shape[1], reference.shape[0]))
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def main() -> None:
+    first = load_gray("cameraman.tif").astype(np.float32)
+    second = resize_like(load_gray("pout.tif"), first).astype(np.float32)
+
+    multiplied = np.clip(first * second / 255.0, 0, 255).astype(np.uint8)
+    divided = np.clip((first / (second + 1.0)) * 128.0, 0, 255).astype(np.uint8)
+
+    save_panels(
+        "solve5_multiplication_division.png",
+        [
+            ("Image A", first),
+            ("Image B", second),
+            ("A x B / 255", multiplied),
+            ("128 x A / (B + 1)", divided),
+        ],
+    )
+    print("Image multiplication and protected division completed.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve6.py ===
+
+"""Problem 6: Invert an 8-bit grayscale image."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def main() -> None:
+    image = load_gray("cameraman.tif")
+    inverted = 255 - image
+    save_panels(
+        "solve6_inversion.png", [("Original", image), ("Negative", inverted)]
+    )
+    assert (image.astype(int) + inverted.astype(int) == 255).all()
+    print("Image inversion verified: original + negative = 255.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve7.py ===
+
+"""Problem 7: Convert two images to binary and perform XOR."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def resize_like(image: np.ndarray, reference: np.ndarray) -> np.ndarray:
+    return cv2.resize(image, (reference.shape[1], reference.shape[0]))
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def main() -> None:
+    first = load_gray("cameraman.tif")
+    second = resize_like(load_gray("pout.tif"), first)
+    threshold_a, binary_a = cv2.threshold(
+        first, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
+    threshold_b, binary_b = cv2.threshold(
+        second, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
+    result = cv2.bitwise_xor(binary_a, binary_b)
+
+    save_panels(
+        "solve7_binary_xor.png",
+        [("Binary A", binary_a), ("Binary B", binary_b), ("A XOR B", result)],
+    )
+    assert set(result.ravel()).issubset({0, 255})
+    print(f"Otsu thresholds: A={threshold_a:.0f}, B={threshold_b:.0f}.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve8.py ===
+
+"""Problem 8: Perform image thresholding."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def main() -> None:
+    image = load_gray("cameraman.tif")
+    manual_threshold = 128
+    _, manual = cv2.threshold(image, manual_threshold, 255, cv2.THRESH_BINARY)
+    otsu_threshold, otsu = cv2.threshold(
+        image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
+
+    save_panels(
+        "solve8_thresholding.png",
+        [
+            ("Original", image),
+            (f"Manual T={manual_threshold}", manual),
+            (f"Otsu T={otsu_threshold:.0f}", otsu),
+        ],
+    )
+    print(f"Manual threshold={manual_threshold}; Otsu threshold={otsu_threshold:.0f}.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve9.py ===
+
+"""Problem 9: Apply logarithmic intensity transformation."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def main() -> None:
+    image = load_gray("cameraman.tif")
+    constant = 255.0 / np.log1p(float(image.max()))
+    transformed = (constant * np.log1p(image.astype(np.float32))).astype(np.uint8)
+
+    save_panels(
+        "solve9_log_transform.png",
+        [("Original", image), ("Log transformation", transformed)],
+    )
+    print(f"Log scaling constant c={constant:.4f}.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve10.py ===
+
+"""Problem 10: Apply exponential intensity transformation."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def main() -> None:
+    image = load_gray("cameraman.tif")
+    normalized = image.astype(np.float32) / 255.0
+    base = 1.6
+    transformed = ((np.power(base, normalized) - 1.0) / (base - 1.0) * 255)
+    transformed = np.clip(transformed, 0, 255).astype(np.uint8)
+
+    save_panels(
+        "solve10_exponential_transform.png",
+        [("Original", image), (f"Exponential, base={base}", transformed)],
+    )
+    print(f"Exponential transformation completed with base={base}.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve11.py ===
+
+"""Problem 11: Differentiate low-contrast and good images by histogram spread."""
+
+import cv2
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def entropy(image: np.ndarray) -> float:
+    histogram = np.bincount(image.ravel(), minlength=256).astype(np.float64)
+    probabilities = histogram[histogram > 0] / image.size
+    return float(-np.sum(probabilities * np.log2(probabilities)))
+
+
+def quality_metrics(image: np.ndarray) -> dict[str, float]:
+    p05, p95 = np.percentile(image, [5, 95])
+    return {
+        "standard deviation": float(image.std()),
+        "90% histogram spread": float(p95 - p05),
+        "entropy": entropy(image),
+    }
+
+
+def main() -> None:
+    poor = load_gray("pout.tif")
+    good = cv2.equalizeHist(poor)
+    poor_metrics = quality_metrics(poor)
+    good_metrics = quality_metrics(good)
+
+    fig, axes = plt.subplots(2, 2, figsize=(10, 7))
+    axes[0, 0].imshow(poor, cmap="gray", vmin=0, vmax=255)
+    axes[0, 0].set_title("Low-contrast image")
+    axes[0, 1].imshow(good, cmap="gray", vmin=0, vmax=255)
+    axes[0, 1].set_title("Contrast-enhanced image")
+    for axis in axes[0]:
+        axis.axis("off")
+    axes[1, 0].hist(poor.ravel(), bins=256, range=(0, 256), color="black")
+    axes[1, 0].set_title("Narrow histogram = poor contrast")
+    axes[1, 1].hist(good.ravel(), bins=256, range=(0, 256), color="black")
+    axes[1, 1].set_title("Wide histogram = good contrast")
+    fig.tight_layout()
+    fig.savefig(OUTPUT_DIR / "solve11_histogram_quality.png", dpi=150)
+    plt.close(fig)
+
+    assert (
+        good_metrics["90% histogram spread"]
+        > poor_metrics["90% histogram spread"]
+    )
+    print("Low-contrast metrics:", poor_metrics)
+    print("Good-image metrics:", good_metrics)
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve12.py ===
+
+"""Problem 12: Contrast stretch using 5th and 95th histogram percentiles."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def main() -> None:
+    image = load_gray("pout.tif")
+    histogram = np.bincount(image.ravel(), minlength=256)
+    cumulative = np.cumsum(histogram) / image.size
+    c = int(np.searchsorted(cumulative, 0.05))
+    d = int(np.searchsorted(cumulative, 0.95))
+
+    stretched = (image.astype(np.float32) - c) * 255.0 / max(d - c, 1)
+    stretched = np.clip(stretched, 0, 255).astype(np.uint8)
+    save_panels(
+        "solve12_contrast_stretch.png",
+        [("Original", image), (f"Stretched (c={c}, d={d})", stretched)],
+    )
+    print(f"5th percentile c={c}; 95th percentile d={d}.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve13.py ===
+
+"""Problem 13: Perform histogram equalization."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def equalize(image: np.ndarray) -> np.ndarray:
+    histogram = np.bincount(image.ravel(), minlength=256)
+    cumulative = histogram.cumsum()
+    nonzero = cumulative[cumulative > 0]
+    cdf_min = nonzero[0]
+    lookup = np.round(
+        (cumulative - cdf_min) * 255.0 / max(image.size - cdf_min, 1)
+    )
+    lookup = np.clip(lookup, 0, 255).astype(np.uint8)
+    return lookup[image]
+
+
+def main() -> None:
+    image = load_gray("pout.tif")
+    result = equalize(image)
+    save_panels(
+        "solve13_histogram_equalization.png",
+        [("Original", image), ("Histogram equalized", result)],
+    )
+    assert result.shape == image.shape
+    print(f"Standard deviation changed from {image.std():.2f} to {result.std():.2f}.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve14.py ===
+
+"""Problem 14: Match the histogram of one image to a reference image."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def resize_like(image: np.ndarray, reference: np.ndarray) -> np.ndarray:
+    return cv2.resize(image, (reference.shape[1], reference.shape[0]))
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def histogram_match(source: np.ndarray, reference: np.ndarray) -> np.ndarray:
+    source_hist = np.bincount(source.ravel(), minlength=256).astype(np.float64)
+    reference_hist = np.bincount(
+        reference.ravel(), minlength=256
+    ).astype(np.float64)
+    source_cdf = np.cumsum(source_hist) / source.size
+    reference_cdf = np.cumsum(reference_hist) / reference.size
+
+    lookup = np.empty(256, dtype=np.uint8)
+    for intensity in range(256):
+        lookup[intensity] = np.argmin(
+            np.abs(reference_cdf - source_cdf[intensity])
+        )
+    return lookup[source]
+
+
+def main() -> None:
+    source = load_gray("pout.tif")
+    reference = resize_like(load_gray("cameraman.tif"), source)
+    matched = histogram_match(source, reference)
+    save_panels(
+        "solve14_histogram_matching.png",
+        [
+            ("Source", source),
+            ("Reference", reference),
+            ("Histogram matched", matched),
+        ],
+    )
+    assert matched.shape == source.shape
+    print("Source histogram matched to the cameraman reference.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve15.py ===
+
+"""Problem 15: Apply a 3x3 mean filter to Gaussian and salt-pepper noise."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def add_gaussian_noise(image: np.ndarray) -> np.ndarray:
+    noise = np.random.default_rng(42).normal(0, 20, image.shape)
+    return np.clip(image.astype(np.float32) + noise, 0, 255).astype(np.uint8)
+
+
+def add_salt_pepper_noise(image: np.ndarray) -> np.ndarray:
+    random_values = np.random.default_rng(42).random(image.shape)
+    noisy = image.copy()
+    noisy[random_values < 0.025] = 0
+    noisy[random_values > 0.975] = 255
+    return noisy
+
+
+def psnr(reference: np.ndarray, test: np.ndarray) -> float:
+    mse = np.mean((reference.astype(float) - test.astype(float)) ** 2)
+    return float("inf") if mse == 0 else float(20 * np.log10(255 / np.sqrt(mse)))
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def main() -> None:
+    original = load_gray("cameraman.tif")
+    gaussian_noisy = add_gaussian_noise(original)
+    salt_pepper_noisy = add_salt_pepper_noise(original)
+    gaussian_filtered = cv2.blur(gaussian_noisy, (3, 3))
+    salt_pepper_filtered = cv2.blur(salt_pepper_noisy, (3, 3))
+
+    save_panels(
+        "solve15_mean_filter.png",
+        [
+            ("Original", original),
+            ("Gaussian noise", gaussian_noisy),
+            ("3x3 mean (Gaussian)", gaussian_filtered),
+            ("Salt-pepper noise", salt_pepper_noisy),
+            ("3x3 mean (S&P)", salt_pepper_filtered),
+        ],
+    )
+    print(
+        "Gaussian PSNR:",
+        f"{psnr(original, gaussian_noisy):.2f} -> "
+        f"{psnr(original, gaussian_filtered):.2f} dB",
+    )
+    print(
+        "Salt-pepper PSNR:",
+        f"{psnr(original, salt_pepper_noisy):.2f} -> "
+        f"{psnr(original, salt_pepper_filtered):.2f} dB",
+    )
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve16.py ===
+
+"""Problem 16: Apply a 3x3 median filter to Gaussian and salt-pepper noise."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def add_gaussian_noise(image: np.ndarray) -> np.ndarray:
+    noise = np.random.default_rng(42).normal(0, 20, image.shape)
+    return np.clip(image.astype(np.float32) + noise, 0, 255).astype(np.uint8)
+
+
+def add_salt_pepper_noise(image: np.ndarray) -> np.ndarray:
+    random_values = np.random.default_rng(42).random(image.shape)
+    noisy = image.copy()
+    noisy[random_values < 0.025] = 0
+    noisy[random_values > 0.975] = 255
+    return noisy
+
+
+def psnr(reference: np.ndarray, test: np.ndarray) -> float:
+    mse = np.mean((reference.astype(float) - test.astype(float)) ** 2)
+    return float("inf") if mse == 0 else float(20 * np.log10(255 / np.sqrt(mse)))
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def main() -> None:
+    original = load_gray("cameraman.tif")
+    gaussian_noisy = add_gaussian_noise(original)
+    salt_pepper_noisy = add_salt_pepper_noise(original)
+    gaussian_filtered = cv2.medianBlur(gaussian_noisy, 3)
+    salt_pepper_filtered = cv2.medianBlur(salt_pepper_noisy, 3)
+
+    save_panels(
+        "solve16_median_filter.png",
+        [
+            ("Original", original),
+            ("Gaussian noise", gaussian_noisy),
+            ("3x3 median (Gaussian)", gaussian_filtered),
+            ("Salt-pepper noise", salt_pepper_noisy),
+            ("3x3 median (S&P)", salt_pepper_filtered),
+        ],
+    )
+    print(
+        "Gaussian PSNR:",
+        f"{psnr(original, gaussian_noisy):.2f} -> "
+        f"{psnr(original, gaussian_filtered):.2f} dB",
+    )
+    print(
+        "Salt-pepper PSNR:",
+        f"{psnr(original, salt_pepper_noisy):.2f} -> "
+        f"{psnr(original, salt_pepper_filtered):.2f} dB",
+    )
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve17.py ===
+
+"""Problem 17: Apply order-25 (maximum) filtering with a 5x5 window."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def add_gaussian_noise(image: np.ndarray) -> np.ndarray:
+    noise = np.random.default_rng(42).normal(0, 20, image.shape)
+    return np.clip(image.astype(np.float32) + noise, 0, 255).astype(np.uint8)
+
+
+def add_salt_pepper_noise(image: np.ndarray) -> np.ndarray:
+    random_values = np.random.default_rng(42).random(image.shape)
+    noisy = image.copy()
+    noisy[random_values < 0.025] = 0
+    noisy[random_values > 0.975] = 255
+    return noisy
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def maximum_filter_5x5(image: np.ndarray) -> np.ndarray:
+    kernel = np.ones((5, 5), dtype=np.uint8)
+    return cv2.dilate(image, kernel)
+
+
+def main() -> None:
+    original = load_gray("cameraman.tif")
+    gaussian_noisy = add_gaussian_noise(original)
+    salt_pepper_noisy = add_salt_pepper_noise(original)
+    gaussian_filtered = maximum_filter_5x5(gaussian_noisy)
+    salt_pepper_filtered = maximum_filter_5x5(salt_pepper_noisy)
+
+    save_panels(
+        "solve17_order25_max_filter.png",
+        [
+            ("Original", original),
+            ("Gaussian noise", gaussian_noisy),
+            ("5x5 order-25 max", gaussian_filtered),
+            ("Salt-pepper noise", salt_pepper_noisy),
+            ("5x5 order-25 max", salt_pepper_filtered),
+        ],
+    )
+    assert np.all(gaussian_filtered >= gaussian_noisy)
+    assert np.all(salt_pepper_filtered >= salt_pepper_noisy)
+    print("The 25th ranked value in each 5x5 neighborhood was selected.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve18.py ===
+
+"""Problem 18: Compare Gaussian filters with sigma=1 and sigma=3."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def add_gaussian_noise(image: np.ndarray) -> np.ndarray:
+    noise = np.random.default_rng(42).normal(0, 20, image.shape)
+    return np.clip(image.astype(np.float32) + noise, 0, 255).astype(np.uint8)
+
+
+def add_salt_pepper_noise(image: np.ndarray) -> np.ndarray:
+    random_values = np.random.default_rng(42).random(image.shape)
+    noisy = image.copy()
+    noisy[random_values < 0.025] = 0
+    noisy[random_values > 0.975] = 255
+    return noisy
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def sharpness(image: np.ndarray) -> float:
+    return float(cv2.Laplacian(image, cv2.CV_64F).var())
+
+
+def main() -> None:
+    original = load_gray("cameraman.tif")
+    gaussian_noisy = add_gaussian_noise(original)
+    salt_pepper_noisy = add_salt_pepper_noise(original)
+
+    g_sigma1 = cv2.GaussianBlur(gaussian_noisy, (0, 0), sigmaX=1)
+    g_sigma3 = cv2.GaussianBlur(gaussian_noisy, (0, 0), sigmaX=3)
+    sp_sigma1 = cv2.GaussianBlur(salt_pepper_noisy, (0, 0), sigmaX=1)
+    sp_sigma3 = cv2.GaussianBlur(salt_pepper_noisy, (0, 0), sigmaX=3)
+
+    save_panels(
+        "solve18_gaussian_sigma_comparison.png",
+        [
+            ("Gaussian noise", gaussian_noisy),
+            ("Gaussian, sigma=1", g_sigma1),
+            ("Gaussian, sigma=3", g_sigma3),
+            ("Salt-pepper noise", salt_pepper_noisy),
+            ("Gaussian, sigma=1", sp_sigma1),
+            ("Gaussian, sigma=3", sp_sigma3),
+        ],
+    )
+    gaussian_scores = [sharpness(x) for x in (gaussian_noisy, g_sigma1, g_sigma3)]
+    salt_pepper_scores = [
+        sharpness(x) for x in (salt_pepper_noisy, sp_sigma1, sp_sigma3)
+    ]
+    assert gaussian_scores[2] < gaussian_scores[1]
+    print("Laplacian-variance sharpness, Gaussian noise:", gaussian_scores)
+    print("Laplacian-variance sharpness, salt-pepper noise:", salt_pepper_scores)
+    print("Higher sigma removes more noise but also reduces image sharpness.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve19.py ===
+
+"""Problem 19: Measure spatial, physical, and informational image properties."""
+
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def entropy(image: np.ndarray) -> float:
+    histogram = np.bincount(image.ravel(), minlength=256).astype(np.float64)
+    probabilities = histogram[histogram > 0] / image.size
+    return float(-np.sum(probabilities * np.log2(probabilities)))
+
+
+def main() -> None:
+    image_path = BASE_DIR / "cameraman.tif"
+    image = load_gray(image_path.name)
+    height, width = image.shape
+    channels = 1
+    bit_depth = image.dtype.itemsize * 8
+    pixel_count = image.size
+    uncompressed_bits = pixel_count * channels * bit_depth
+    image_entropy = entropy(image)
+    estimated_information_bits = image_entropy * pixel_count
+    actual_file_bytes = Path(image_path).stat().st_size
+    dynamic_range = int(image.max()) - int(image.min())
+
+    report = (
+        "SPATIAL PROPERTIES\n"
+        f"Width x height: {width} x {height} pixels\n"
+        f"Total pixels: {pixel_count}\n"
+        f"Channels: {channels}\n\n"
+        "PHYSICAL/STORAGE PROPERTIES\n"
+        f"Data type: {image.dtype}\n"
+        f"Bit depth: {bit_depth} bits/pixel\n"
+        f"Theoretical uncompressed size: {uncompressed_bits} bits "
+        f"({uncompressed_bits / 8:.0f} bytes)\n"
+        f"Actual file size: {actual_file_bytes} bytes\n\n"
+        "INFORMATIONAL PROPERTIES\n"
+        f"Minimum intensity: {image.min()}\n"
+        f"Maximum intensity: {image.max()}\n"
+        f"Dynamic range: {dynamic_range}\n"
+        f"Mean intensity: {np.mean(image):.4f}\n"
+        f"Standard deviation: {np.std(image):.4f}\n"
+        f"Entropy: {image_entropy:.4f} bits/pixel\n"
+        f"Estimated information: {estimated_information_bits:.2f} bits\n"
+    )
+    (OUTPUT_DIR / "solve19_image_properties.txt").write_text(
+        report, encoding="utf-8"
+    )
+    print(report)
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve20.py ===
+
+"""Problem 20: Huffman encode, decode, evaluate, and verify an image."""
+
+import heapq
+import json
+from dataclasses import dataclass
+from itertools import count
+from pathlib import Path
+from typing import Optional
+
+import cv2
+import numpy as np
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def entropy(image: np.ndarray) -> float:
+    histogram = np.bincount(image.ravel(), minlength=256).astype(np.float64)
+    probabilities = histogram[histogram > 0] / image.size
+    return float(-np.sum(probabilities * np.log2(probabilities)))
+
+
+@dataclass
+class Node:
+    symbol: Optional[int] = None
+    left: Optional["Node"] = None
+    right: Optional["Node"] = None
+
+
+def build_tree(frequencies: np.ndarray) -> Node:
+    serial = count()
+    heap: list[tuple[int, int, Node]] = [
+        (int(frequency), next(serial), Node(symbol=symbol))
+        for symbol, frequency in enumerate(frequencies)
+        if frequency > 0
+    ]
+    heapq.heapify(heap)
+    if len(heap) == 1:
+        return heap[0][2]
+    while len(heap) > 1:
+        frequency_a, _, left = heapq.heappop(heap)
+        frequency_b, _, right = heapq.heappop(heap)
+        parent = Node(left=left, right=right)
+        heapq.heappush(
+            heap, (frequency_a + frequency_b, next(serial), parent)
+        )
+    return heap[0][2]
+
+
+def make_codes(
+    node: Node, prefix: str = "", codes: Optional[dict[int, str]] = None
+) -> dict[int, str]:
+    if codes is None:
+        codes = {}
+    if node.symbol is not None:
+        codes[node.symbol] = prefix or "0"
+        return codes
+    make_codes(node.left, prefix + "0", codes)
+    make_codes(node.right, prefix + "1", codes)
+    return codes
+
+
+def decode(bit_string: str, tree: Node, count_to_decode: int) -> np.ndarray:
+    if tree.symbol is not None:
+        return np.full(count_to_decode, tree.symbol, dtype=np.uint8)
+    decoded = np.empty(count_to_decode, dtype=np.uint8)
+    output_index = 0
+    node = tree
+    for bit in bit_string:
+        node = node.left if bit == "0" else node.right
+        if node.symbol is not None:
+            decoded[output_index] = node.symbol
+            output_index += 1
+            if output_index == count_to_decode:
+                break
+            node = tree
+    if output_index != count_to_decode:
+        raise ValueError("Encoded data ended before all pixels were decoded.")
+    return decoded
+
+
+def main() -> None:
+    image = load_gray("cameraman.tif")
+    frequencies = np.bincount(image.ravel(), minlength=256)
+    tree = build_tree(frequencies)
+    codes = make_codes(tree)
+
+    encoded = "".join(codes[int(pixel)] for pixel in image.ravel())
+    bit_array = np.fromiter((bit == "1" for bit in encoded), dtype=np.uint8)
+    packed = np.packbits(bit_array)
+    (OUTPUT_DIR / "solve20_huffman.bin").write_bytes(packed.tobytes())
+    (OUTPUT_DIR / "solve20_codebook.json").write_text(
+        json.dumps({str(key): value for key, value in codes.items()}, indent=2),
+        encoding="utf-8",
+    )
+
+    decoded = decode(encoded, tree, image.size).reshape(image.shape)
+    cv2.imwrite(str(OUTPUT_DIR / "solve20_reconstructed.png"), decoded)
+    perfect_reconstruction = np.array_equal(image, decoded)
+    assert perfect_reconstruction
+
+    original_bits = image.size * 8
+    compressed_bits = len(encoded)
+    average_code_length = compressed_bits / image.size
+    compression_ratio = original_bits / compressed_bits
+    report = (
+        f"Unique symbols: {len(codes)}\n"
+        f"Entropy: {entropy(image):.4f} bits/pixel\n"
+        f"Average Huffman length: {average_code_length:.4f} bits/pixel\n"
+        f"Original size: {original_bits} bits\n"
+        f"Compressed data size: {compressed_bits} bits\n"
+        f"Compression ratio: {compression_ratio:.4f}:1\n"
+        f"Perfect reconstruction: {perfect_reconstruction}"
+    )
+    (OUTPUT_DIR / "solve20_huffman_report.txt").write_text(
+        report, encoding="utf-8"
+    )
+    print(report)
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve21.py ===
+
+"""Problem 21: Compare first- and second-order derivative edge detectors."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def normalize_u8(image: np.ndarray) -> np.ndarray:
+    return cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def main() -> None:
+    image = load_gray("cameraman.tif")
+    float_image = image.astype(np.float32)
+
+    sobel_x = cv2.Sobel(float_image, cv2.CV_32F, 1, 0, ksize=3)
+    sobel_y = cv2.Sobel(float_image, cv2.CV_32F, 0, 1, ksize=3)
+    first_order = np.hypot(sobel_x, sobel_y)
+
+    laplacian = cv2.Laplacian(float_image, cv2.CV_32F, ksize=3)
+    second_order = np.abs(laplacian)
+
+    first_edges = (first_order > np.percentile(first_order, 85)).astype(
+        np.uint8
+    ) * 255
+    second_edges = (second_order > np.percentile(second_order, 85)).astype(
+        np.uint8
+    ) * 255
+
+    save_panels(
+        "solve21_derivative_edge_comparison.png",
+        [
+            ("Original", image),
+            ("1st order: Sobel magnitude", normalize_u8(first_order)),
+            ("1st order edges", first_edges),
+            ("2nd order: |Laplacian|", normalize_u8(second_order)),
+            ("2nd order edges", second_edges),
+        ],
+    )
+    print(
+        "Detected edge pixels - first order:",
+        int(np.count_nonzero(first_edges)),
+        "second order:",
+        int(np.count_nonzero(second_edges)),
+    )
+    print("Sobel gives gradient strength; Laplacian reacts to rapid changes in all directions.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve22.py ===
+
+"""Problem 22: Detect isolated points using a Laplacian point mask."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def normalize_u8(image: np.ndarray) -> np.ndarray:
+    return cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+LAPLACIAN_POINT_MASK = np.array(
+    [[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype=np.float32
+)
+
+
+def detect_points(
+    image: np.ndarray, threshold: float
+) -> tuple[np.ndarray, np.ndarray]:
+    response = cv2.filter2D(
+        image.astype(np.float32), cv2.CV_32F, LAPLACIAN_POINT_MASK
+    )
+    detections = (np.abs(response) >= threshold).astype(np.uint8) * 255
+    return response, detections
+
+
+def main() -> None:
+    synthetic = np.full((128, 128), 100, dtype=np.uint8)
+    known_point = (64, 64)
+    synthetic[known_point] = 255
+    response, detected = detect_points(synthetic, threshold=500)
+    assert detected[known_point] == 255
+
+    image = load_gray("cameraman.tif")
+    real_response, real_detected = detect_points(image, threshold=500)
+    save_panels(
+        "solve22_isolated_point_detection.png",
+        [
+            ("Known isolated point", synthetic),
+            ("Laplacian response", normalize_u8(np.abs(response))),
+            ("Verified detection", detected),
+            ("Test image", image),
+            ("Image point candidates", real_detected),
+        ],
+    )
+    print(
+        f"Known point at {known_point} detected successfully; "
+        f"{np.count_nonzero(real_detected)} candidates found in the test image."
+    )
+    print(f"Maximum test-image response: {np.max(np.abs(real_response)):.2f}.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve23.py ===
+
+"""Problem 23: Apply Roberts, Prewitt, and Sobel edge detectors."""
+
+from pathlib import Path
+
+import cv2
+import matplotlib
+import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_gray(name: str) -> np.ndarray:
+    image = cv2.imread(str(BASE_DIR / name), cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError(f"Could not read {BASE_DIR / name}")
+    return image
+
+
+def normalize_u8(image: np.ndarray) -> np.ndarray:
+    return cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+
+
+def save_panels(filename: str, panels: list[tuple[str, np.ndarray]]) -> None:
+    figure, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4))
+    for axis, (title, image) in zip(axes, panels):
+        axis.imshow(image, cmap="gray", vmin=0, vmax=255)
+        axis.set_title(title)
+        axis.axis("off")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / filename, dpi=150)
+    plt.close(figure)
+
+
+def gradient(
+    image: np.ndarray, kernel_x: np.ndarray, kernel_y: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    gx = cv2.filter2D(image.astype(np.float32), cv2.CV_32F, kernel_x)
+    gy = cv2.filter2D(image.astype(np.float32), cv2.CV_32F, kernel_y)
+    magnitude = np.hypot(gx, gy)
+    direction = np.degrees(np.arctan2(gy, gx))
+    return magnitude, direction
+
+
+def main() -> None:
+    image = load_gray("cameraman.tif")
+    roberts_x = np.array([[1, 0], [0, -1]], dtype=np.float32)
+    roberts_y = np.array([[0, 1], [-1, 0]], dtype=np.float32)
+    prewitt_x = np.array([[-1, 0, 1]] * 3, dtype=np.float32)
+    prewitt_y = prewitt_x.T
+    sobel_x = np.array(
+        [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=np.float32
+    )
+    sobel_y = sobel_x.T
+
+    roberts_magnitude, _ = gradient(image, roberts_x, roberts_y)
+    prewitt_magnitude, _ = gradient(image, prewitt_x, prewitt_y)
+    sobel_magnitude, sobel_direction = gradient(image, sobel_x, sobel_y)
+
+    direction_for_display = np.zeros_like(image)
+    strong_edges = sobel_magnitude > np.percentile(sobel_magnitude, 70)
+    direction_for_display[strong_edges] = (
+        (sobel_direction[strong_edges] + 180) / 360 * 255
+    ).astype(np.uint8)
+    save_panels(
+        "solve23_roberts_prewitt_sobel.png",
+        [
+            ("Original", image),
+            ("Roberts magnitude", normalize_u8(roberts_magnitude)),
+            ("Prewitt magnitude", normalize_u8(prewitt_magnitude)),
+            ("Sobel magnitude", normalize_u8(sobel_magnitude)),
+            ("Sobel direction", direction_for_display),
+        ],
+    )
+    print(f"Maximum Roberts gradient: {roberts_magnitude.max():.2f}")
+    print(f"Maximum Prewitt gradient: {prewitt_magnitude.max():.2f}")
+    print(f"Maximum Sobel gradient: {sobel_magnitude.max():.2f}")
+    print(
+        "Sobel direction range:",
+        f"{sobel_direction.min():.2f} to {sobel_direction.max():.2f} degrees.",
+    )
+
+
+if __name__ == "__main__":
+    main()
+
+
+=== solve24.py ===
+
+"""Problem 24: Train and evaluate a CNN on the MNIST digit database."""
+
+import argparse
+import os
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Codex sets DEBUG=release, while tinygrad expects DEBUG to be an integer.
+os.environ["DEBUG"] = "0"
+
+from tinygrad import Tensor, nn
+from tinygrad.nn.datasets import mnist
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+class DigitCNN:
+    def __init__(self) -> None:
+        self.conv1 = nn.Conv2d(1, 8, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(8, 16, kernel_size=3, padding=1)
+        self.fc1 = nn.Linear(16 * 7 * 7, 64)
+        self.fc2 = nn.Linear(64, 10)
+
+    def __call__(self, images: Tensor) -> Tensor:
+        features = self.conv1(images).relu().max_pool2d()
+        features = self.conv2(features).relu().max_pool2d()
+        features = features.reshape(features.shape[0], -1)
+        features = self.fc1(features).relu().dropout(0.25)
+        return self.fc2(features)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument(
+        "--train-limit",
+        type=int,
+        default=5000,
+        help="Use 0 for all 60,000 training images.",
+    )
+    parser.add_argument(
+        "--test-limit",
+        type=int,
+        default=1000,
+        help="Use 0 for all 10,000 test images.",
+    )
+    parser.add_argument("--batch-size", type=int, default=64)
+    return parser.parse_args()
+
+
+def prepare_data(limit: int, images: Tensor, labels: Tensor):
+    count = len(images) if limit <= 0 else min(limit, len(images))
+    image_array = images[:count].numpy().astype(np.float32) / 255.0
+    image_array = (image_array - 0.1307) / 0.3081
+    label_array = labels[:count].numpy().astype(np.int32)
+    return image_array, label_array
+
+
+def predict_in_batches(
+    model: DigitCNN, images: np.ndarray, batch_size: int
+) -> np.ndarray:
+    predictions = []
+    for start in range(0, len(images), batch_size):
+        logits = model(Tensor(images[start : start + batch_size]))
+        predictions.append(logits.argmax(axis=1).numpy())
+    return np.concatenate(predictions)
+
+
+def main() -> None:
+    args = parse_args()
+    np.random.seed(42)
+    Tensor.manual_seed(42)
+
+    train_images, train_labels, test_images, test_labels = mnist()
+    x_train, y_train = prepare_data(args.train_limit, train_images, train_labels)
+    x_test, y_test = prepare_data(args.test_limit, test_images, test_labels)
+
+    model = DigitCNN()
+    optimizer = nn.optim.Adam(nn.state.get_parameters(model), lr=0.001)
+
+    for epoch in range(args.epochs):
+        permutation = np.random.permutation(len(x_train))
+        total_loss = 0.0
+        with Tensor.train():
+            for start in range(0, len(x_train), args.batch_size):
+                indices = permutation[start : start + args.batch_size]
+                images = Tensor(x_train[indices])
+                labels = Tensor(y_train[indices])
+                loss = model(images).sparse_categorical_crossentropy(labels)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item() * len(indices)
+        print(
+            f"Epoch {epoch + 1}/{args.epochs}, "
+            f"loss={total_loss / len(x_train):.4f}"
+        )
+
+    with Tensor.train(False):
+        predictions = predict_in_batches(model, x_test, args.batch_size)
+    accuracy = float(np.mean(predictions == y_test) * 100)
+
+    model_path = OUTPUT_DIR / "solve24_mnist_cnn.safetensors"
+    nn.state.safe_save(nn.state.get_state_dict(model), str(model_path))
+
+    figure, axes = plt.subplots(2, 5, figsize=(10, 4))
+    for axis, image, label, prediction in zip(
+        axes.ravel(), x_test[:10], y_test[:10], predictions[:10]
+    ):
+        axis.imshow(image.squeeze(), cmap="gray")
+        axis.set_title(f"True {label}, Pred {prediction}")
+        axis.axis("off")
+    figure.suptitle(f"MNIST CNN predictions - accuracy {accuracy:.2f}%")
+    figure.tight_layout()
+    figure.savefig(OUTPUT_DIR / "solve24_mnist_predictions.png", dpi=150)
+    plt.close(figure)
+
+    assert len(predictions) == len(y_test)
+    print("Framework: tinygrad")
+    print(f"Training samples: {len(x_train)}")
+    print(f"Test samples: {len(x_test)}")
+    print(f"Test accuracy: {accuracy:.2f}%")
+    print(f"Model saved to: {model_path}")
+
+
+if __name__ == "__main__":
+    main()
